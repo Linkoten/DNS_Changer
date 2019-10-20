@@ -142,7 +142,18 @@ Function Get_Actual_DNS
     return $results
 }
 
-
+Function Desactive_Button
+{
+    $Button_ActiveDNS.Enabled = $false
+    $Button_AutomaticDNS.Enabled = $false
+    $Button_CreateBatch.Enabled = $false
+}
+Function Active_Button
+{
+    $Button_ActiveDNS.Enabled = $true
+    $Button_AutomaticDNS.Enabled = $true
+    $Button_CreateBatch.Enabled = $true
+}
 #Init Variable
 [hashtable]$HashDNS_1 = [ordered]@{'OpenDNS' = '208.67.222.222'; 'CloudflareDNS' = '1.1.1.1'; 'Google DNS' = '8.8.8.8'; 'Norton DNS' = '199.85.126.20'; 'Custom DNS' = ''}
 [hashtable]$HashDNS_2 = [ordered]@{'OpenDNS' = '208.67.220.220'; 'CloudflareDNS' = '1.0.0.1'; 'Google DNS' = '8.8.4.4'; 'Norton DNS' = '199.85.127.10'; 'Custom DNS' = ''}
@@ -171,10 +182,20 @@ $FormLabel_PrimaryDNS = CreateFormLabel '14' '25' '100' '20' 'Primary DNS'
 $FormLabel_SecondaryDNS = CreateFormLabel '175' '25' '100' '20' 'Secondary DNS'
 $FormLabel_PersoDNS1 = CreateFormLabel '13' '125' '100' '20' 'Custom DNS 1'
 $FormLabel_PersoDNS2 = CreateFormLabel '173' '125' '100' '20' 'Custom DNS2'
+$FormLabel_ActualDNS1 = CreateFormLabel '10' '220' '300' '20' 'Actual DNS 1 :'
+$FormLabel_ActualDNS2 = CreateFormLabel '10' '250' '100' '20' 'Actual DNS 2 :'
+$FormLabel_Process = CreateFormLabel '400' '220' '100' '20' ''
 
-[array]$Actual_DNS = Get_Actual_DNS
-$FormLabel_Information_1 = CreateFormLabel '10' '220' '300' '20' $Actual_DNS[0]
-$FormLabel_Information_2 = CreateFormLabel '10' '250' '100' '20' $Actual_DNS[1]
+[array]$ActualDNS = Get_Actual_DNS
+if($ActualDNS[0] -eq 'true'){
+    $FormLabel_Information_1 = CreateFormLabel '100' '220' '300' '20' 'Automatic DNS'
+    $FormLabel_Information_2 = CreateFormLabel '100' '250' '100' '20' ''
+}
+else{
+    $FormLabel_Information_1 = CreateFormLabel '100' '220' '300' '20' $ActualDNS[0]
+    $FormLabel_Information_2 = CreateFormLabel '100' '250' '100' '20' $ActualDNS[1]
+}
+
 
 
 
@@ -219,39 +240,52 @@ $Button_ActiveDNS.BackColor = ''
 
 
 $Button_ActiveDNS.Add_Click({
+    Desactive_Button
+    $PrimaryDNS = SelectDNS $HashDNS_1 $ListBox_PrimaryDNS $TextBox_PersoDNS1
+    $SecondaryDNS = SelectDNS $HashDNS_2 $ListBox_SecondaryDNS $TextBox_PersoDNS2
+
+        
     $PrimaryDNS = SelectDNS $HashDNS_1 $ListBox_PrimaryDNS $TextBox_PersoDNS1
     $SecondaryDNS = SelectDNS $HashDNS_2 $ListBox_SecondaryDNS $TextBox_PersoDNS2
     $II = (Get-NetIPConfiguration).InterfaceIndex
     Set-DnsClientServerAddress -InterfaceIndex $II -ServerAddress $PrimaryDNS, $SecondaryDNS
-    $test = Get_Actual_DNS
-    $FormLabel_Information_1.Text = $test[0]
-    $FormLabel_Information_2.Text = $test[1]
+    $ActualDNS = Get_Actual_DNS
+    $FormLabel_Information_1.Text = $ActualDNS[0]
+    $FormLabel_Information_2.Text = $ActualDNS[1]
 
-    if(($test[0] -eq $PrimaryDNS) -and ($test[1] -eq $SecondaryDNS)){
-        $Button_ActiveDNS.BackColor = 'green'
+    if(($ActualDNS[0] -eq $PrimaryDNS) -and ($ActualDNS[1] -eq $SecondaryDNS)){
+        $FormLabel_Process.Text = 'Done'
+        $FormLabel_Process.ForeColor = 'green'
         }
-    else{
-        $Button_ActiveDNS.BackColor = 'red'
-      }
+    else{  
+        $FormLabel_Process.Text = 'Fail'
+        $FormLabel_Process.ForeColor = 'red'
+        }
 
+    Active_Button
 })
 
 
 
 
 $Button_AutomaticDNS.Add_Click({
+    Desactive_Button
     $II = (Get-NetIPConfiguration).InterfaceIndex
     
     Set-DnsClientServerAddress -InterfaceIndex $II -ResetServerAddress
-    $Acutal_DNS = Get_Actual_DNS
-    $FormLabel_Information_1.Text = $Actual_DNS[0]
-    $FormLabel_Information_2.Text = ''
-    $Button_AutomaticDNS.BackColor = 'green'
+    $ActualDNS = Get_Actual_DNS
+    if($ActualDNS[0] -eq 'true'){
+
+        $FormLabel_Information_1.Text = 'Automatic DNS'
+        $FormLabel_Information_2.Text = ''
+        }
+    Active_Button
 })
 
 
 
 $Button_CreateBatch.Add_Click({
+    Desactive_Button
     $SaveChooser = New-Object System.Windows.Forms.SaveFileDialog
     $SaveChooser.filename = "Fast_DNS_Changer"
     $SaveChooser.Filter = "Batch script (*.bat)|*.bat"
@@ -266,6 +300,7 @@ $Button_CreateBatch.Add_Click({
         $CI = $ConnectionID.netconnectionid
         $File = "netsh interface ip set dns name='$CI' source=static address='$PrimaryDNS'`r`nnetsh interface ip add dns name='$CI' addr='$SecondaryDNS' index=2" > "$Directory"
         }
+    Active_Button
 })
 
 
@@ -276,6 +311,9 @@ $main_form.Controls.Add($FormLabel_PersoDNS1)
 $main_form.Controls.Add($FormLabel_PersoDNS2)
 $main_form.Controls.Add($FormLabel_Information_1)
 $main_form.Controls.Add($FormLabel_Information_2)
+$main_form.Controls.Add($FormLabel_ActualDNS1)
+$main_form.Controls.Add($FormLabel_ActualDNS2)
+$main_form.Controls.Add($FormLabel_Process)
 
 $main_form.Controls.Add($ListBox_PrimaryDNS)
 $main_form.Controls.Add($ListBox_SecondaryDNS)
